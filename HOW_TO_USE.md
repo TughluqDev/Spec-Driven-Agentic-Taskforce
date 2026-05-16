@@ -4,16 +4,15 @@
 
 ## What is this system?
 
-This repository contains a **Planner-led multi-agent Claude Code workflow**.
-Instead of asking Claude to do everything at once, it divides engineering work into five specialist agents:
+A **Planner-led multi-agent Claude Code workflow** that divides engineering work into five specialist agents, each with a dedicated model, instructions, and toolset:
 
-| Agent | Role |
-|-------|------|
-| **Planner** | Orchestrates all work. Plans, delegates, gates, summarizes. |
-| **Programmer** | Implements code from a contract. Nothing more. |
-| **Tester** | Runs real checks: unit tests, API requests, browser checks. |
-| **Reviewer** | Reviews code, security, risks, and test evidence. |
-| **Documentor** | Writes feature docs and a PR message. |
+| Agent | Model | Role |
+|-------|-------|------|
+| **Planner** | Opus 4.7 | Orchestrates all work. Plans, delegates, gates, summarizes. |
+| **Programmer** | Sonnet 4.6 | Implements code from a contract. Nothing else. |
+| **Tester** | Sonnet 4.6 | Runs real checks: unit tests, API requests, browser checks. |
+| **Reviewer** | Opus 4.7 | Reviews code, security, risks, and test evidence. |
+| **Documentor** | Sonnet 4.6 | Writes feature docs and a PR message. |
 
 The Planner is the entry point. You always talk to the Planner.
 
@@ -27,94 +26,118 @@ AGENTS.md                   — Human-readable agent team reference
 HOW_TO_USE.md               — This file
 
 .claude/
-├── settings.json           — Claude Code permissions config
+├── settings.json           — Claude Code permissions (auto-allow list)
 ├── agents/
-│   ├── planner.md          — Planner agent definition
-│   ├── programmer.md       — Programmer agent definition
-│   ├── tester.md           — Tester agent definition
-│   ├── reviewer.md         — Reviewer agent definition
-│   └── documentor.md       — Documentor agent definition
+│   ├── planner.md          — Planner (Opus 4.7)
+│   ├── programmer.md       — Programmer (Sonnet 4.6)
+│   ├── tester.md           — Tester (Sonnet 4.6)
+│   ├── reviewer.md         — Reviewer (Opus 4.7)
+│   └── documentor.md       — Documentor (Sonnet 4.6)
 │
-├── skills/
-│   ├── planner-project-intake/SKILL.md
-│   ├── planner-master-plan/SKILL.md
-│   ├── planner-clarifying-questions/SKILL.md
-│   ├── planner-implementation-contract/SKILL.md
-│   ├── planner-test-contract/SKILL.md
-│   ├── programmer-implementation/SKILL.md
-│   ├── programmer-refactor-safety/SKILL.md
-│   ├── programmer-debugging/SKILL.md
-│   ├── tester-test-report/SKILL.md
-│   ├── tester-playwright-ui-check/SKILL.md
-│   ├── tester-api-check/SKILL.md
-│   ├── tester-regression-check/SKILL.md
-│   ├── reviewer-code-review/SKILL.md
-│   ├── reviewer-risk-analysis/SKILL.md
-│   ├── reviewer-security-check/SKILL.md
-│   ├── documentor-feature-doc/SKILL.md
-│   └── documentor-pr-message/SKILL.md
+├── skills/                 — Detailed how-to instructions for each agent
+│   ├── planner-project-intake/
+│   ├── planner-master-plan/
+│   ├── planner-clarifying-questions/
+│   ├── planner-implementation-contract/
+│   ├── planner-test-contract/
+│   ├── programmer-implementation/
+│   ├── programmer-refactor-safety/
+│   ├── programmer-debugging/
+│   ├── tester-test-report/
+│   ├── tester-playwright-ui-check/
+│   ├── tester-api-check/
+│   ├── tester-regression-check/
+│   ├── reviewer-code-review/
+│   ├── reviewer-risk-analysis/
+│   └── reviewer-security-check/
+│   ├── documentor-feature-doc/
+│   └── documentor-pr-message/
 │
-└── work/
-    ├── PROJECT_BRIEF.md        — Project understanding
-    ├── MASTER_PLAN.md          — Phased plan
-    ├── IMPLEMENTATION_CONTRACT.md  — Exact instructions for Programmer
-    ├── TEST_CONTRACT.md        — Exact instructions for Tester
-    ├── TEST_REPORT.md          — Tester's findings
-    ├── REVIEW_REPORT.md        — Reviewer's findings
-    ├── FEATURE_DOC.md          — Human feature documentation
-    ├── PR_MESSAGE.md           — Ready-to-paste PR message
-    ├── TASKS.md                — Task tracking
-    └── DECISIONS.md            — Recorded assumptions
+└── work/                   — Shared workflow artifacts (written/read by agents)
+    ├── PROJECT_BRIEF.md
+    ├── MASTER_PLAN.md
+    ├── IMPLEMENTATION_CONTRACT.md
+    ├── TEST_CONTRACT.md
+    ├── TEST_REPORT.md
+    ├── REVIEW_REPORT.md
+    ├── FEATURE_DOC.md
+    ├── PR_MESSAGE.md
+    ├── TASKS.md
+    └── DECISIONS.md
 ```
 
 ---
 
-## How to start Claude Code
+## HOW TO ACTIVATE THE SYSTEM
 
-### Standard (cloud Claude)
+### Method 1 — Sub-agent selector (most reliable)
 
-```bash
-claude
+Claude Code automatically discovers agents from `.claude/agents/*.md`.
+To launch the Planner specifically, type this at the start of any prompt:
+
+```
+/agent planner
 ```
 
-### With local Ollama / Qwen (smaller models)
+Then describe your task. The Planner will orchestrate everything from there.
 
-Claude Code supports local models via Ollama. Use the `--model` flag:
+### Method 2 — Activation phrase in your prompt
 
-```bash
-# With Qwen2.5-Coder 3B (faster, less context)
-claude --model qwen2.5-coder:3b
+Include this phrase at the top of your request:
 
-# With Qwen2.5-Coder 7B (better quality, more context)
-claude --model qwen2.5-coder:7b
+```
+Use the planner-led workflow.
 ```
 
-Make sure Ollama is running and the model is pulled:
-```bash
-ollama pull qwen2.5-coder:3b
-ollama pull qwen2.5-coder:7b
-ollama serve
+Claude will recognize this phrase and activate the Planner agent.
+
+### Method 3 — Full activation prompt (copy-paste ready)
+
 ```
+Use the planner-led workflow.
+
+Goal:
+[Describe your feature or bug fix here]
+
+Required flow:
+1. Planner reads CLAUDE.md and the project, then writes planning artifacts.
+2. Planner asks only blocking clarification questions.
+3. Planner delegates to programmer, tester, reviewer, documentor in that order.
+4. Planner gives me a final summary.
+```
+
+**Any of the three methods works.** Method 3 is the most explicit.
 
 ---
 
-## How to make sure the Planner is active
+## Quick start — your first real task
 
-The agents in this system use `model: inherit`, which means they inherit whatever
-model you started Claude Code with.
+1. Open a terminal in this project directory
+2. Run: `claude`
+3. Type this prompt (replace the goal with your actual task):
 
-To activate a specific agent, you can either:
+```
+Use the planner-led workflow.
 
-1. **Tell Claude in your prompt** — include "Use the planner-led workflow" in your request
-2. **Use the `/agent` command** (if your Claude Code version supports it):
-   ```
-   /agent planner
-   ```
-3. **Reference the Planner directly** — Claude Code discovers agents from `.claude/agents/*.md`
-   and can activate them by name
+Goal:
+Add a health check endpoint GET /api/health that returns {"status": "ok"}.
 
-If you are unsure, include the phrase **"Use the planner-led workflow"** at the top of every request.
-This tells the system to start with the Planner agent.
+Required flow:
+1. Planner creates PROJECT_BRIEF, MASTER_PLAN, IMPLEMENTATION_CONTRACT,
+   TEST_CONTRACT, TASKS, DECISIONS.
+2. Ask me any blocking questions first.
+3. Delegate implementation → test → review → document.
+4. Give me the final summary.
+```
+
+The system will:
+- Ask you BLOCKING questions (if any) in one batch
+- Build the implementation plan
+- Write the code (Programmer)
+- Test it with real HTTP requests (Tester)
+- Review code quality and security (Reviewer)
+- Write docs and a PR message (Documentor)
+- Return a final summary to you
 
 ---
 
@@ -122,131 +145,85 @@ This tells the system to start with the Planner agent.
 
 Before using the system for real work, verify it is set up correctly.
 
-Copy and paste this prompt:
-
 ```
 Use the planner-led workflow.
 
 Goal:
-Do a dry run only. Do not modify production source code.
+Do a dry run only. Do NOT modify any production source code.
 
-Check whether the agent system is usable:
+Steps:
 1. Read CLAUDE.md, AGENTS.md, and HOW_TO_USE.md.
-2. Inspect .claude/agents and .claude/skills.
-3. Verify the planner can delegate to programmer, tester, reviewer, and documentor.
-4. Verify tester has frontend MCP and backend API testing instructions.
-5. Verify documentor has feature-doc and PR-message instructions.
-6. Write a readiness report to .claude/work/AGENT_SYSTEM_READINESS.md.
+2. Inspect .claude/agents/ and .claude/skills/.
+3. Confirm all 5 agents exist with their model assignments.
+4. Confirm all 17 skills are present.
+5. Write a readiness report to .claude/work/AGENT_SYSTEM_READINESS.md.
 ```
 
-Expected output: a file at `.claude/work/AGENT_SYSTEM_READINESS.md` saying the system is ready.
-
----
-
-## How to give a real feature request
-
-Copy and paste this template, filling in your actual goal:
-
-```
-Use the planner-led workflow.
-
-Goal:
-Add a health check endpoint to this project.
-
-Required flow:
-1. Planner creates or updates PROJECT_BRIEF, MASTER_PLAN, IMPLEMENTATION_CONTRACT,
-   TEST_CONTRACT, TASKS, and DECISIONS.
-2. Planner asks blocking clarification questions if needed.
-3. Planner delegates implementation to programmer.
-4. Planner delegates verification to tester.
-5. Tester uses backend API checks if applicable.
-6. Tester uses Playwright MCP if frontend behavior is involved.
-7. Planner delegates review to reviewer.
-8. Planner delegates documentation and PR message to documentor.
-9. Planner gives me the final summary.
-```
-
-Replace the goal with your actual task. Keep the required flow section — it activates the full pipeline.
+Expected output: `.claude/work/AGENT_SYSTEM_READINESS.md` with a READY verdict.
 
 ---
 
 ## How clarification questions work
 
-The Planner will ask clarifying questions only when genuinely blocked.
-It classifies every question as:
+The Planner classifies every unknown:
 
-- **BLOCKING** — asked in one batch. Answer these to proceed.
-- **NON-BLOCKING** — recorded as an assumption. No answer needed.
-- **NICE-TO-HAVE** — deferred. Not asked.
+| Class | Behavior |
+|-------|----------|
+| **BLOCKING** | Asked in one batch. You must answer to proceed. |
+| **NON-BLOCKING** | Recorded as assumption in DECISIONS.md. No answer needed. |
+| **NICE-TO-HAVE** | Deferred completely. Not asked. |
 
-**How to answer:**
-Reply directly in the chat. The Planner will continue after your answers.
-
-**If you want to skip a question:**
-Say "Make a reasonable assumption and continue." The Planner will record the assumption and proceed.
+**To skip a question:** Reply "Make a reasonable assumption and continue."  
+**If you want no questions at all:** Add "Make all assumptions needed and record them in DECISIONS.md." to your prompt.
 
 ---
 
-## How each agent works
+## How each agent uses its model
 
-### Programmer
-- Reads only `.claude/work/IMPLEMENTATION_CONTRACT.md`
-- Modifies only files explicitly listed in the contract
-- Runs lint/typecheck when available
-- Does NOT claim the feature is complete
-
-### Tester
-- Reads `.claude/work/TEST_CONTRACT.md`
-- Runs unit tests, API checks, and browser checks
-- Writes TEST_REPORT.md with PASS or FAIL verdict backed by real evidence
-
-### Reviewer
-- Reads the git diff and changed files
-- Checks code quality, security, architecture, and risk
-- Writes REVIEW_REPORT.md with PASS or FAIL verdict
-
-### Documentor
-- Reads TEST_REPORT.md and REVIEW_REPORT.md
-- Writes FEATURE_DOC.md and PR_MESSAGE.md
-- Never claims PASS unless the reports say PASS
+| Agent | Why that model |
+|-------|---------------|
+| Planner (Opus 4.7) | Needs deep reasoning to synthesize requirements, detect ambiguities, write precise contracts, and manage the multi-step workflow |
+| Programmer (Sonnet 4.6) | Excellent at code generation; follows precise instructions; fast |
+| Tester (Sonnet 4.6) | Systematic verification; good at structured command execution and reporting |
+| Reviewer (Opus 4.7) | Needs nuanced judgment for security issues, risk assessment, and subtle correctness bugs |
+| Documentor (Sonnet 4.6) | Strong at structured writing; fast; cost-effective for documentation |
 
 ---
 
 ## How the Tester does backend API checks
 
-The Tester sends real HTTP requests using the tools available on your machine.
+The Tester sends real HTTP requests and records real responses.
 
-**On Linux/Mac:**
+**On Linux / Mac:**
 ```bash
 curl -s -w "\n[HTTP %{http_code}]" \
-  -X POST http://localhost:3000/api/health \
+  -X POST http://localhost:3000/api/tasks \
   -H "Content-Type: application/json" \
-  -d '{"key": "value"}'
+  -d '{"title": "Buy groceries"}'
 ```
 
 **On Windows (PowerShell):**
 ```powershell
-$resp = Invoke-WebRequest -Uri "http://localhost:3000/api/health" -Method GET
-Write-Output "Status: $($resp.StatusCode)"
-Write-Output "Body: $($resp.Content)"
+try {
+  $resp = Invoke-WebRequest -Uri "http://localhost:3000/api/tasks" `
+    -Method POST -ContentType "application/json" `
+    -Body '{"title": "Buy groceries"}' -UseBasicParsing
+  "Status: $($resp.StatusCode)"
+  $resp.Content
+} catch {
+  "Status: $($_.Exception.Response.StatusCode.value__)"
+  $_.ErrorDetails.Message
+}
 ```
 
-The Tester checks:
-- HTTP status codes
-- Response body contents
-- Validation error behavior
-- Auth enforcement (401 / 403)
-- Edge cases
+The Tester records: method, URL, request body, **actual** status code, **actual** response body.
+It never fabricates results. If the server is not running, it marks the check FAIL.
 
 ---
 
-## How to set up Playwright MCP for frontend testing
+## How to set up Playwright MCP (browser testing)
 
-Playwright MCP enables the Tester to control a real browser and verify UI behavior.
-
-### Step 1 — Install Playwright MCP in Claude Code settings
-
-Add this to your Claude Code MCP configuration (`~/.claude/claude_desktop_config.json` or equivalent):
+Add this to your Claude Code MCP configuration (`~/.claude/claude_desktop_config.json`):
 
 ```json
 {
@@ -260,33 +237,61 @@ Add this to your Claude Code MCP configuration (`~/.claude/claude_desktop_config
 }
 ```
 
-### Step 2 — Verify it is available
+Restart Claude Code. The Tester will automatically use it when UI checks are needed.
 
-In Claude Code, check that Playwright MCP tools appear in your tool list.
-You should see tools like `browser_navigate`, `browser_click`, `browser_screenshot`.
+If Playwright MCP is not available, the Tester writes manual testing steps and marks browser checks as `MANUAL-REQUIRED` — not FAIL.
 
-### Step 3 — Include browser checks in your request
+---
 
-When your feature has a UI, tell the Planner:
+## Retry logic and failure handling
 
+The Planner has a **retry budget of 2 cycles per phase**:
+
+- If the Tester returns FAIL → Planner fixes the implementation and retries (up to 2 times)
+- If the Reviewer returns FAIL → Planner fixes and retries (up to 2 times)
+- On 3rd failure → Planner **stops and escalates to you** with the full failure chain
+
+This prevents infinite loops while still recovering from common failures automatically.
+
+---
+
+## How to use the system for different task types
+
+### New feature
 ```
-Tester must verify the UI using Playwright MCP.
+Use the planner-led workflow.
+Goal: Add [feature description].
+Full pipeline: plan → implement → test → review → document.
 ```
 
-The Tester will navigate to pages, interact with elements, and take screenshots as evidence.
+### Bug fix
+```
+Use the planner-led workflow.
+Goal: Fix [describe the bug]. Expected: [what should happen].
+Full pipeline: plan → implement → test → review → document.
+```
 
-### If Playwright MCP is not available
+### Planning only (no code)
+```
+Use the planner-led workflow.
+Goal: Plan only. Do not implement.
+I want to [describe what you want]. Write the MASTER_PLAN and IMPLEMENTATION_CONTRACT.
+Stop before delegating to programmer.
+```
 
-The Tester will:
-- Note which browser checks could not run automatically
-- Write step-by-step manual testing instructions in TEST_REPORT.md
-- Mark those checks as MANUAL-REQUIRED (not FAIL)
+### Code review only
+```
+Use the planner-led workflow.
+Goal: Review only. Do not implement or test.
+Review the current git diff against .claude/work/IMPLEMENTATION_CONTRACT.md.
+Write REVIEW_REPORT.md with a PASS or FAIL verdict.
+```
 
 ---
 
 ## How to copy this system into another project
 
-1. Copy these files and folders to the root of the new project:
+1. Copy these to the root of the new project:
    ```
    CLAUDE.md
    AGENTS.md
@@ -294,161 +299,68 @@ The Tester will:
    .claude/
    ```
 
-2. Clear the work files so they are blank templates again:
+2. Clear the work artifacts:
    ```bash
-   # Reset all work artifacts to templates (keeps the files, clears content)
-   # Run this from the project root
+   # Windows PowerShell
+   Remove-Item .claude\work\*.md
+
+   # Linux / Mac
+   rm .claude/work/*.md
    ```
-   Or see "How to reset .claude/work/" below.
 
 3. Update `CLAUDE.md` if the new project has different coding standards.
 
-4. Run the dry-run check to verify the system works.
+4. Run the dry-run check to verify everything is working.
 
 ---
 
-## How to reset .claude/work/
+## How to reset .claude/work/ between features
 
-When starting a new feature or a new project, clear the work artifacts:
-
-**Option A — Delete and let Planner recreate:**
 ```bash
-# In the project root
-rm .claude/work/PROJECT_BRIEF.md
-rm .claude/work/MASTER_PLAN.md
-rm .claude/work/IMPLEMENTATION_CONTRACT.md
-rm .claude/work/TEST_CONTRACT.md
-rm .claude/work/TEST_REPORT.md
-rm .claude/work/REVIEW_REPORT.md
-rm .claude/work/FEATURE_DOC.md
-rm .claude/work/PR_MESSAGE.md
-rm .claude/work/TASKS.md
-rm .claude/work/DECISIONS.md
-```
+# Windows PowerShell
+Remove-Item .\.claude\work\PROJECT_BRIEF.md, `
+  .\.claude\work\MASTER_PLAN.md, `
+  .\.claude\work\IMPLEMENTATION_CONTRACT.md, `
+  .\.claude\work\TEST_CONTRACT.md, `
+  .\.claude\work\TEST_REPORT.md, `
+  .\.claude\work\REVIEW_REPORT.md, `
+  .\.claude\work\FEATURE_DOC.md, `
+  .\.claude\work\PR_MESSAGE.md, `
+  .\.claude\work\TASKS.md, `
+  .\.claude\work\DECISIONS.md `
+  -ErrorAction SilentlyContinue
 
-**Option B — Keep the templates:**
-The work files in this repo are already blank templates. They are overwritten
-by the Planner at the start of each workflow run.
+# Linux / Mac
+rm -f .claude/work/{PROJECT_BRIEF,MASTER_PLAN,IMPLEMENTATION_CONTRACT,TEST_CONTRACT,TEST_REPORT,REVIEW_REPORT,FEATURE_DOC,PR_MESSAGE,TASKS,DECISIONS}.md
+```
 
 ---
 
 ## Common problems and fixes
 
-### "Claude is just writing code without planning"
-
-Include **"Use the planner-led workflow"** in your prompt.
-The Planner agent must be explicitly activated.
-
-### "The Planner is asking too many questions"
-
-Reply: "Make reasonable assumptions and continue. Record your assumptions in DECISIONS.md."
-
-### "The Tester says tests passed but didn't run them"
-
-The Tester is instructed never to claim PASS without evidence. If it does:
-- Reply: "Show me the actual command output for the test results."
-- If you are using a small model (3B), the model may have limited ability to run commands. Switch to 7B.
-
-### "Commands are failing"
-
-The Tester reports failures to the Planner. The Planner may re-delegate to the Programmer.
-If the failure is persistent, the Planner will report it to you.
-
-### "The agent modified files it shouldn't have"
-
-Check `.claude/work/IMPLEMENTATION_CONTRACT.md → Files allowed to modify`.
-If a file was modified that is not on the list, that is a contract violation.
-Report it: "The programmer modified `<file>` which is not in the allowed list. This is incorrect."
-
-### "Playwright MCP is not working"
-
-If browser tools do not appear, Playwright MCP is not configured.
-The Tester will fall back to MANUAL-REQUIRED for browser checks.
-See "How to set up Playwright MCP" above.
-
-### "I'm using Qwen 3B and the agent seems confused"
-
-Qwen2.5-Coder 3B has a small context window. Tips:
-- Keep your requests short and specific
-- Do one feature at a time (don't chain multiple features in one prompt)
-- Use Qwen 7B if 3B cannot follow multi-step instructions reliably
-- The work files help compensate — the agent reads contracts, not memory
+| Problem | Fix |
+|---------|-----|
+| Claude writes code immediately without planning | Add "Use the planner-led workflow" to your prompt |
+| Planner asks too many questions | Reply: "Make reasonable assumptions and record them in DECISIONS.md" |
+| Tester claims PASS without showing output | Reply: "Show me the exact command output" |
+| Programmer modified a file not in the contract | Report: "The programmer modified `<file>` which is not in the allowed list" |
+| Browser tests not running | Playwright MCP not configured — see setup section above |
+| Reviewer is too strict / blocking on minor issues | Reply: "Accept the RECOMMENDED findings as non-blocking and continue" |
+| Planner not delegating to sub-agents | Ensure your prompt includes "Required flow: ... delegate to programmer/tester/reviewer/documentor" |
 
 ---
 
-## Best practices for smaller local models (Qwen 3B/7B)
+## Local model support (Qwen 3B / 7B)
 
-- **One task at a time.** Do not ask for multiple features in one prompt.
-- **Be explicit.** "Use the planner-led workflow" is better than "plan this."
-- **Short prompts.** Long prompts consume context that the model needs for reasoning.
-- **Check artifacts.** After each step, read `.claude/work/` files to verify the Planner is tracking correctly.
-- **Prefer 7B over 3B** for complex features. 3B is for simple, single-endpoint changes.
-- **Reset between features.** Clear `.claude/work/` files between unrelated features to avoid context confusion.
+The system supports local models via Ollama. For local models, change the `model:` field in each agent file to `inherit`, then start Claude Code with:
 
----
-
-## Example prompts
-
-### Dry run
-
-```
-Use the planner-led workflow.
-
-Goal:
-Do a dry run only. Do not modify production source code.
-
-Check whether the agent system is usable:
-1. Read CLAUDE.md, AGENTS.md, and HOW_TO_USE.md.
-2. Inspect .claude/agents and .claude/skills.
-3. Verify the planner can delegate to programmer, tester, reviewer, and documentor.
-4. Verify tester has frontend MCP and backend API testing instructions.
-5. Verify documentor has feature-doc and PR-message instructions.
-6. Write a readiness report to .claude/work/AGENT_SYSTEM_READINESS.md.
+```bash
+claude --model qwen2.5-coder:7b
 ```
 
-### Feature request
-
-```
-Use the planner-led workflow.
-
-Goal:
-Add a health check endpoint to this project.
-
-Required flow:
-1. Planner creates or updates PROJECT_BRIEF, MASTER_PLAN, IMPLEMENTATION_CONTRACT,
-   TEST_CONTRACT, TASKS, and DECISIONS.
-2. Planner asks blocking clarification questions if needed.
-3. Planner delegates implementation to programmer.
-4. Planner delegates verification to tester.
-5. Tester uses backend API checks if applicable.
-6. Tester uses Playwright MCP if frontend behavior is involved.
-7. Planner delegates review to reviewer.
-8. Planner delegates documentation and PR message to documentor.
-9. Planner gives me the final summary.
-```
-
-### Bug fix
-
-```
-Use the planner-led workflow.
-
-Goal:
-Fix the bug where the login endpoint returns 500 when the email field is missing.
-It should return 400 with {"error": "email is required"}.
-
-Required flow: full pipeline (plan → implement → test → review → document).
-```
-
-### Planner-only planning session
-
-```
-Use the planner-led workflow.
-
-Goal:
-Plan only. Do not implement anything yet.
-
-I want to add pagination to the /api/posts endpoint.
-Write the PROJECT_BRIEF, MASTER_PLAN, IMPLEMENTATION_CONTRACT, TEST_CONTRACT, and TASKS.
-Ask me any blocking questions first.
-Stop after planning — do not delegate to programmer.
-```
+Tips for local models:
+- Use 7B minimum for the Planner and Reviewer (need more reasoning)
+- Keep prompts short and specific
+- One feature at a time — no chained requests
+- Clear `.claude/work/` between features to avoid context overflow
+- If a model fails to follow the contract, simplify the contract task descriptions

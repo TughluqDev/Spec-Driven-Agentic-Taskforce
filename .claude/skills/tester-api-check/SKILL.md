@@ -2,7 +2,7 @@
 name: tester-api-check
 description: >
   Teaches the Tester how to test backend APIs using curl, PowerShell
-  Invoke-RestMethod, npm scripts, or project-specific API clients. Covers
+  Invoke-WebRequest, npm scripts, or project-specific API clients. Covers
   happy paths, validation errors, auth behavior, and edge cases.
 ---
 
@@ -11,144 +11,220 @@ description: >
 ## Purpose
 
 Verify that API endpoints behave correctly by sending real HTTP requests and
-inspecting real responses. This is the only reliable way to test backend behavior.
+inspecting real responses. This is the only reliable way to verify backend behavior.
+Static analysis and unit tests cannot replace it.
 
 ## When to Use
 
 When the test contract includes API check scenarios.
 When the feature adds or changes any API endpoint.
 
-## Input
-
-- `.claude/work/TEST_CONTRACT.md` (API check scenarios)
-- The running server URL and port
-
-## Output
-
-- API check results recorded in `TEST_REPORT.md`
-
 ---
 
-## Ensuring the Server Is Running
+## Step 1 — Start and Verify the Server
 
-Before running API checks, verify the server is running:
-
-```bash
-# Check if a port is in use (Linux/Mac)
-lsof -i :3000
-
-# Check if a port is in use (Windows PowerShell)
+**Check if server is running (Windows PowerShell):**
+```powershell
 netstat -an | findstr :3000
+# If you see LISTENING, the port is in use. Confirm it's your server.
 ```
 
-If the server is not running, start it:
+**Check if server is running (Linux / Mac):**
 ```bash
-npm run dev
-# or
-npm start
-# or
-python main.py
-# or
-go run .
+lsof -i :3000
 ```
 
-Wait for the ready message before sending requests.
+**Start the server if needed:**
+```bash
+# Try in order based on project type:
+npm run dev
+npm start
+node server.js
+python main.py
+go run .
+cargo run
+```
+
+Wait for the "ready" or "listening" message before sending any requests.
+If the server fails to start, record the error and mark API checks as FAIL — do not fabricate responses.
 
 ---
 
-## Making Requests
+## Step 2 — Run Each Scenario
 
-### Linux / Mac — curl
+### Windows — PowerShell templates
 
-Basic GET:
+**GET request:**
+```powershell
+$resp = Invoke-WebRequest -Uri "http://localhost:3000/api/health" -Method GET -UseBasicParsing
+"Status: $($resp.StatusCode)"
+$resp.Content | ConvertFrom-Json | ConvertTo-Json -Depth 10
+```
+
+**POST with JSON:**
+```powershell
+$body = '{"title": "Buy groceries"}'
+$resp = Invoke-WebRequest -Uri "http://localhost:3000/api/tasks" `
+  -Method POST `
+  -ContentType "application/json" `
+  -Body $body `
+  -UseBasicParsing
+"Status: $($resp.StatusCode)"
+$resp.Content
+```
+
+**PATCH / PUT:**
+```powershell
+$body = '{"completed": true}'
+$resp = Invoke-WebRequest -Uri "http://localhost:3000/api/tasks/1" `
+  -Method PATCH `
+  -ContentType "application/json" `
+  -Body $body `
+  -UseBasicParsing
+"Status: $($resp.StatusCode)"
+$resp.Content
+```
+
+**DELETE:**
+```powershell
+$resp = Invoke-WebRequest -Uri "http://localhost:3000/api/tasks/1" `
+  -Method DELETE `
+  -UseBasicParsing
+"Status: $($resp.StatusCode)"
+$resp.Content
+```
+
+**With Auth header:**
+```powershell
+$headers = @{ Authorization = "Bearer eyJ...TOKEN" }
+$resp = Invoke-WebRequest -Uri "http://localhost:3000/api/protected" `
+  -Method GET `
+  -Headers $headers `
+  -UseBasicParsing
+"Status: $($resp.StatusCode)"
+$resp.Content
+```
+
+**Handling 4xx errors (PowerShell throws on non-2xx by default):**
+```powershell
+try {
+  $resp = Invoke-WebRequest -Uri "http://localhost:3000/api/tasks" `
+    -Method POST `
+    -ContentType "application/json" `
+    -Body '{}' `
+    -UseBasicParsing
+  "Status: $($resp.StatusCode)"
+  $resp.Content
+} catch {
+  $statusCode = $_.Exception.Response.StatusCode.value__
+  $body = $_.ErrorDetails.Message
+  "Status: $statusCode"
+  "Body: $body"
+}
+```
+
+### Linux / Mac — curl templates
+
+**GET:**
 ```bash
 curl -s -w "\n[HTTP %{http_code}]" http://localhost:3000/api/health
 ```
 
-POST with JSON body:
+**POST with JSON:**
 ```bash
 curl -s -w "\n[HTTP %{http_code}]" \
-  -X POST http://localhost:3000/api/users \
+  -X POST http://localhost:3000/api/tasks \
   -H "Content-Type: application/json" \
-  -d '{"name": "Alice", "email": "alice@example.com"}'
+  -d '{"title": "Buy groceries"}'
 ```
 
-With auth header:
+**PATCH:**
 ```bash
 curl -s -w "\n[HTTP %{http_code}]" \
-  -H "Authorization: Bearer <token>" \
+  -X PATCH http://localhost:3000/api/tasks/1 \
+  -H "Content-Type: application/json" \
+  -d '{"completed": true}'
+```
+
+**DELETE:**
+```bash
+curl -s -w "\n[HTTP %{http_code}]" \
+  -X DELETE http://localhost:3000/api/tasks/1
+```
+
+**With auth:**
+```bash
+curl -s -w "\n[HTTP %{http_code}]" \
+  -H "Authorization: Bearer TOKEN" \
   http://localhost:3000/api/protected
 ```
 
-### Windows — PowerShell Invoke-WebRequest
+---
 
-```powershell
-$resp = Invoke-WebRequest -Uri "http://localhost:3000/api/health" -Method GET
-Write-Output "Status: $($resp.StatusCode)"
-Write-Output "Body: $($resp.Content)"
-```
+## Step 3 — Required Scenarios Per Endpoint
 
-POST with JSON:
-```powershell
-$body = '{"name": "Alice", "email": "alice@example.com"}'
-$resp = Invoke-WebRequest -Uri "http://localhost:3000/api/users" `
-  -Method POST `
-  -ContentType "application/json" `
-  -Body $body
-Write-Output "Status: $($resp.StatusCode)"
-Write-Output "Body: $($resp.Content)"
-```
+For every endpoint in the test contract, run ALL of these:
 
-With auth:
-```powershell
-$resp = Invoke-WebRequest -Uri "http://localhost:3000/api/protected" `
-  -Headers @{ Authorization = "Bearer <token>" }
-```
+### Scenario A — Happy path
+- Valid request with all required fields, valid auth if needed
+- Expected: 2xx status + correct response body with all required fields present
+
+### Scenario B — Missing required field
+- Omit one required field from the request body
+- Expected: 400 or 422 + error message mentioning the missing field
+
+### Scenario C — Empty/blank required field
+- Send an empty string `""` for a required string field
+- Expected: 400 or 422 + error message
+
+### Scenario D — Auth checks (for protected endpoints only)
+- No token → 401
+- Invalid/expired token → 401 (or 403)
+- Valid token → 2xx
+
+### Scenario E — Not found (for endpoints taking a resource ID)
+- Request with a non-existent ID (e.g., `id=99999`)
+- Expected: 404 + error message
+
+### Scenario F — Edge cases from the test contract
+Test each edge case listed in TEST_CONTRACT.md
 
 ---
 
-## Required Test Scenarios
+## Step 4 — Record Results
 
-For every endpoint in the test contract, run:
-
-### 1. Happy path
-- Send a valid request with all required fields
-- Expect: 2xx status + correct response body
-
-### 2. Validation error
-- Send a request with missing or invalid fields
-- Expect: 400 or 422 with an error message
-
-### 3. Auth check (if endpoint requires auth)
-- Send request with no token → expect 401
-- Send request with invalid token → expect 401 or 403
-- Send request with valid token → expect 2xx
-
-### 4. Edge cases from test contract
-- Empty string values
-- Missing optional fields
-- Extra unexpected fields
-- Very large inputs (if applicable)
-
----
-
-## Recording Results
-
-Capture and record for each scenario:
+For each scenario in TEST_REPORT.md:
 
 ```markdown
-### API: POST /api/users (happy path)
+### API: POST /api/tasks — happy path
 **Request:**
 ```
-POST http://localhost:3000/api/users
+POST http://localhost:3000/api/tasks
 Content-Type: application/json
-Body: {"name": "Alice", "email": "alice@example.com"}
+Body: {"title": "Buy groceries"}
 ```
 **Expected status:** 201
 **Actual status:** 201
 **Response body:**
 ```json
-{"id": "123", "name": "Alice", "email": "alice@example.com"}
+{"id": "abc123", "title": "Buy groceries", "completed": false, "createdAt": "2026-05-16T..."}
+```
+**Result:** PASS
+
+---
+
+### API: POST /api/tasks — empty title
+**Request:**
+```
+POST http://localhost:3000/api/tasks
+Content-Type: application/json
+Body: {"title": ""}
+```
+**Expected status:** 400
+**Actual status:** 400
+**Response body:**
+```json
+{"error": "Title is required"}
 ```
 **Result:** PASS
 ```
@@ -157,16 +233,19 @@ Body: {"name": "Alice", "email": "alice@example.com"}
 
 ## Quality Checklist
 
-- [ ] Server was confirmed running before tests started
+- [ ] Server was confirmed running before any test
 - [ ] Happy path tested for every endpoint
 - [ ] Validation error tested for every endpoint
 - [ ] Auth behavior tested for every protected endpoint
-- [ ] Actual status codes are recorded (not assumed)
-- [ ] Actual response bodies are recorded
+- [ ] Not-found case tested for every ID-based endpoint
+- [ ] Actual status codes recorded (not assumed)
+- [ ] Actual response bodies recorded (not expected bodies)
+- [ ] 4xx error handling used correctly (try/catch in PowerShell)
 
 ## Safety Rules
 
-- Never send requests to production URLs. Use localhost or a test environment.
-- Never use real user credentials in test requests.
-- Never run tests that delete or modify real data.
-- If the server is not running, note this in the report — do not fabricate responses.
+- Never send requests to production URLs. Use localhost or a dedicated test environment only.
+- Never use real user credentials or real API keys in test requests.
+- Never run tests that irreversibly modify or delete real data.
+- If the server is not running, record FAIL — do not fabricate responses.
+- Record the actual response, not what you expect. The actual is the evidence.

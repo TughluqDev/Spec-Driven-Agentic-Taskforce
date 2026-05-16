@@ -11,149 +11,244 @@ description: >
 ## Purpose
 
 Find security vulnerabilities before they reach production.
-Any security finding is automatically a REQUIRED fix — no exceptions.
+Any security finding is a REQUIRED fix. No exceptions. No RECOMMENDED severity for security issues.
 
 ## When to Use
 
-As part of the review process. Always run this check, even for small changes.
-
-## Input
-
-- Changed files (full content)
-- Git diff
-- `.claude/work/IMPLEMENTATION_CONTRACT.md`
-
-## Output
-
-Security findings in `.claude/work/REVIEW_REPORT.md`
+On every review. Always. Even for "small" changes. Security issues hide in small changes.
 
 ---
 
-## Security Checks
+## Check 1 — Hardcoded Secrets
 
-### 1. Hardcoded Secrets
-
-Look for:
-- API keys, tokens, passwords in source code
-- Base64-encoded strings that might encode credentials
-- Connection strings with embedded credentials
-- Private keys or certificates
+Look for API keys, tokens, passwords, private keys in source code.
 
 ```bash
-grep -rn "password\s*=\s*['\"]" src/
-grep -rn "secret\s*=\s*['\"]" src/
-grep -rn "api_key\s*=\s*['\"]" src/
-grep -rn "Bearer " src/
+# Passwords and secrets
+grep -rn --include="*.ts" --include="*.js" --include="*.py" --include="*.go" \
+  -E "(password|secret|passwd|pwd)\s*[=:]\s*['\"][^'\"]" src/
+
+# API keys and tokens  
+grep -rn --include="*.ts" --include="*.js" --include="*.py" \
+  -E "(api[_-]?key|apikey|access[_-]?token|auth[_-]?token)\s*[=:]\s*['\"]" src/
+
+# Bearer tokens hardcoded
+grep -rn --include="*.ts" --include="*.js" -E "Bearer [A-Za-z0-9+/]{20,}" src/
+
+# Private keys
+grep -rn "BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY" src/
+
+# Base64 that might be credentials (long base64 strings assigned to variables)
+grep -rn -E "['\"][A-Za-z0-9+/]{40,}={0,2}['\"]" src/
+
+# Connection strings with credentials
+grep -rn -E "(mongodb|postgres|mysql|redis)://[^:]+:[^@]+@" src/
+grep -rn -E "Server=.*;Password=" src/
 ```
 
-Any hardcoded secret is an automatic FAIL.
+**Any hardcoded secret → automatic FAIL.**
 
-### 2. SQL Injection
+### Patterns that look innocent but are not:
+- Config files with real credentials checked in
+- Test fixtures with real-looking API keys
+- "Example" config files with actual tokens
 
-Look for raw string concatenation in SQL queries:
+---
 
-```python
-# Dangerous
-query = "SELECT * FROM users WHERE id = " + user_id
+## Check 2 — SQL Injection
 
-# Safe
-query = "SELECT * FROM users WHERE id = $1", [user_id]
+Look for raw string concatenation or interpolation in database queries.
+
+```bash
+# Template literal SQL (JavaScript/TypeScript)
+grep -rn --include="*.ts" --include="*.js" \
+  -E "query\s*\(\s*\`[^']*\$\{" src/
+
+# String concatenation in SQL (JavaScript/TypeScript)
+grep -rn --include="*.ts" --include="*.js" \
+  -E "(SELECT|INSERT|UPDATE|DELETE|WHERE).*\+.*req\." src/
+
+# f-string SQL (Python)
+grep -rn --include="*.py" \
+  -E "execute\s*\(\s*f['\"]" src/
+
+# Python % formatting in SQL
+grep -rn --include="*.py" \
+  -E "execute\s*\(\s*['\"].*%\s*(" src/
+
+# Go Sprintf SQL
+grep -rn --include="*.go" \
+  -E "Sprintf.*SELECT|Sprintf.*INSERT|Sprintf.*WHERE" .
 ```
 
-```javascript
-// Dangerous
-db.query(`SELECT * FROM users WHERE id = ${req.params.id}`)
+**Safe patterns to confirm:**
+- JS/TS: `db.query('SELECT * FROM t WHERE id = $1', [id])`
+- Python: `cursor.execute('SELECT * FROM t WHERE id = %s', (id,))`
+- Go: `db.Query("SELECT * FROM t WHERE id = $1", id)`
+- ORM: Prisma, SQLAlchemy, GORM all parameterize automatically
 
-// Safe
-db.query('SELECT * FROM users WHERE id = $1', [req.params.id])
+---
+
+## Check 3 — Command Injection
+
+Look for shell execution with user-controlled input.
+
+```bash
+# Python shell=True
+grep -rn --include="*.py" "shell=True" .
+
+# Python os.system with variables
+grep -rn --include="*.py" -E "os\.system\s*\(.*(\+|f['\"]|format)" .
+
+# Python subprocess with user input in string
+grep -rn --include="*.py" -E "subprocess\.(run|call|Popen)\s*\(\s*f['\"]" .
+
+# Node child_process exec with user input
+grep -rn --include="*.ts" --include="*.js" \
+  -E "exec\s*\(\s*['\`][^']*\$\{" .
+
+# Node child_process exec with concatenation
+grep -rn --include="*.ts" --include="*.js" \
+  -E "child_process.*exec\s*\(.*\+" .
 ```
 
-Any unparameterized query using user input is an automatic FAIL.
+**Safe patterns:**
+- Always use argument arrays: `subprocess.run(["git", "clone", user_url])`
+- In Node.js: `execFile()` or `spawn()` with array args, never `exec()` with string interpolation
 
-### 3. Command Injection
+---
 
-Look for shell execution with user-controlled input:
+## Check 4 — Cross-Site Scripting (XSS)
 
-```python
-# Dangerous
-subprocess.run(f"git clone {user_url}", shell=True)
-os.system(f"convert {filename}")
+Look for user input rendered in HTML without escaping.
 
-# Safe
-subprocess.run(["git", "clone", user_url])
+```bash
+# innerHTML assignment
+grep -rn --include="*.ts" --include="*.js" --include="*.tsx" --include="*.jsx" \
+  "innerHTML\s*=" src/
+
+# document.write
+grep -rn --include="*.ts" --include="*.js" --include="*.tsx" --include="*.jsx" \
+  "document\.write(" src/
+
+# React dangerouslySetInnerHTML
+grep -rn --include="*.tsx" --include="*.jsx" --include="*.ts" --include="*.js" \
+  "dangerouslySetInnerHTML" src/
+
+# Vue v-html directive
+grep -rn --include="*.vue" "v-html" src/
+
+# Template engines without escaping
+grep -rn --include="*.ejs" --include="*.hbs" --include="*.pug" \
+  -E "<%=|{{{|\!\{" .
 ```
 
-Any `shell=True` or equivalent with user input is an automatic FAIL.
-
-### 4. Cross-Site Scripting (XSS)
-
-Look for user input rendered directly in HTML without escaping:
-
-```javascript
-// Dangerous
-element.innerHTML = userInput
-document.write(userInput)
-
-// Safe
-element.textContent = userInput
+**XSS in server-rendered HTML — Python:**
+```bash
+grep -rn --include="*.py" -E "Markup\(|mark_safe\(|escape=False" .
 ```
 
-Any unescaped user input in HTML context is an automatic FAIL.
+**Safe patterns:**
+- React: Use JSX expressions `{userInput}` (auto-escaped), not `dangerouslySetInnerHTML`
+- Node/Express: Use template engines with auto-escaping; never mark content as safe
+- Always use `element.textContent` not `element.innerHTML`
 
-### 5. Path Traversal
+---
 
-Look for user-controlled file paths used in file operations:
+## Check 5 — Path Traversal
 
-```python
-# Dangerous
-open(f"/uploads/{user_filename}")
+Look for user-controlled values used in file system operations.
 
-# Safe — validate and sanitize filename first
-safe_name = os.path.basename(user_filename)
-if '..' in safe_name or safe_name.startswith('/'):
-    raise ValueError("Invalid filename")
-open(f"/uploads/{safe_name}")
+```bash
+# Node.js file operations with user input
+grep -rn --include="*.ts" --include="*.js" \
+  -E "(readFile|writeFile|createReadStream|existsSync)\s*\(.*req\." src/
+
+# Python file operations
+grep -rn --include="*.py" \
+  -E "open\s*\(.*request\." src/
+
+# Path.join with user input (still unsafe without validation)
+grep -rn --include="*.ts" --include="*.js" \
+  -E "path\.join\s*\(.*req\." src/
+
+# Directory traversal characters in path handling
+grep -rn --include="*.ts" --include="*.js" --include="*.py" \
+  -E "\.\.\/" src/
 ```
 
-### 6. Authentication and Authorization
+**Safe pattern:** Always use `path.basename()` + whitelist validation, then resolve against a known safe directory.
 
-For every new or changed endpoint:
-- Is authentication required? Is it enforced?
-- Is authorization checked (not just authentication)?
-- Can a user access another user's data by guessing an ID?
-- Are admin-only routes protected from regular users?
+---
 
-### 7. Sensitive Data in Logs
+## Check 6 — Authentication and Authorization
 
-Look for passwords, tokens, or PII being logged:
+For every new or modified endpoint, verify:
 
-```javascript
-// Dangerous
-console.log('User logged in:', { email, password })
+1. **Authentication** — is the route protected if it should be?
+   ```bash
+   grep -rn "router\.(get|post|put|patch|delete)" src/routes/
+   # Check each unprotected route — is that intentional?
+   ```
 
-// Safe
-console.log('User logged in:', { email })
+2. **Authorization** — after verifying who the user is, does code verify what they can do?
+   ```bash
+   # Look for resource access without ownership check
+   grep -rn --include="*.ts" --include="*.js" \
+     -E "params\.id|params\[:id\]" src/routes/
+   # Each hit: does the handler verify req.user.id === resource.userId?
+   ```
+
+3. **IDOR (Insecure Direct Object Reference)** — can a user access another user's resources?
+   - Any endpoint that takes a resource ID from the URL/body and returns that resource
+   - Verify: the handler checks `resource.userId === req.user.id` (or equivalent ownership/permission check)
+
+4. **Admin routes** — are admin-only endpoints protected from regular users?
+   ```bash
+   grep -rn "admin\|isAdmin\|role.*admin" src/routes/
+   ```
+
+---
+
+## Check 7 — Sensitive Data Exposure
+
+Look for passwords, tokens, or PII in logs or responses.
+
+```bash
+# Password in logs
+grep -rn --include="*.ts" --include="*.js" --include="*.py" \
+  -E "(console\.log|print|logger)\s*\(.*password" src/
+
+# Token in logs
+grep -rn --include="*.ts" --include="*.js" \
+  -E "(console\.log|logger\.(info|debug|warn))\s*\(.*token" src/
+
+# Full user object logged (might include password hash)
+grep -rn --include="*.ts" --include="*.js" \
+  -E "console\.log\s*\(\s*(user|req\.user)" src/
+
+# Password field returned in API response
+grep -rn --include="*.ts" --include="*.js" \
+  -E "res\.json\s*\(\s*user" src/
+# Check: does the user object include password field?
 ```
 
-### 8. Insecure Direct Object References (IDOR)
+---
 
-Look for endpoints that accept a resource ID from the request without verifying
-the requester owns or has permission to access that resource:
+## Check 8 — Dependency Security (if applicable)
 
-```javascript
-// Dangerous — user can change :id to access any user's data
-app.get('/api/users/:id/orders', async (req, res) => {
-  const orders = await db.getOrders(req.params.id) // no ownership check
-})
+```bash
+# Node.js — check for known vulnerabilities
+npm audit --audit-level=high
 
-// Safe
-app.get('/api/users/:id/orders', async (req, res) => {
-  if (req.user.id !== req.params.id && !req.user.isAdmin) {
-    return res.status(403).json({ error: 'Forbidden' })
-  }
-  ...
-})
+# Python
+pip-audit  # if installed
+
+# Check for packages with known issues
+grep -E "(node-serialize|serialize-javascript|log4j)" package.json
 ```
+
+Note any HIGH or CRITICAL findings.
 
 ---
 
@@ -162,29 +257,33 @@ app.get('/api/users/:id/orders', async (req, res) => {
 ```markdown
 ## Security Review
 
-### Hardcoded secrets: NONE FOUND / FOUND
-<detail if found — file, line, type of secret>
+### Hardcoded secrets
+NONE FOUND
+— or —
+FOUND: `src/config/db.ts:14` — hardcoded database password in connection string
 
-### SQL injection: NONE FOUND / FOUND
-<detail if found>
+### SQL injection
+NONE FOUND
+— or —
+FOUND: `src/routes/users.ts:42` — raw string interpolation in SELECT query
 
 ### Command injection: NONE FOUND / FOUND
-<detail if found>
 
 ### XSS: NONE FOUND / FOUND
-<detail if found>
 
 ### Path traversal: NONE FOUND / FOUND
-<detail if found>
 
-### Auth/authorization: ADEQUATE / ISSUES FOUND
-<detail if issues found>
+### Authentication / authorization
+ADEQUATE — all new routes protected by existing auth middleware
+— or —
+ISSUES FOUND: `src/routes/admin.ts:18` — DELETE /api/admin/users has no role check
 
 ### Sensitive data in logs: NONE FOUND / FOUND
-<detail if found>
 
 ### IDOR: NONE FOUND / FOUND
-<detail if found>
+
+### Dependency vulnerabilities
+NOT CHECKED / NONE FOUND / FOUND (<severity> in <package>)
 
 ### Security verdict: PASS / FAIL
 ```
@@ -193,13 +292,16 @@ app.get('/api/users/:id/orders', async (req, res) => {
 
 ## Quality Checklist
 
-- [ ] Every check was run, not just the ones that seemed likely
-- [ ] Grep searches were used to find patterns beyond the diff
+- [ ] Every grep search was run, not just the likely ones
+- [ ] Every new endpoint was checked for auth and authorization
 - [ ] Each finding includes exact file path and line number
-- [ ] Any finding is classified as REQUIRED (security findings are never RECOMMENDED)
+- [ ] All findings are classified REQUIRED (never RECOMMENDED for security)
+- [ ] Verdict is FAIL if any finding exists
 
 ## Safety Rules
 
-- Never downgrade a security finding to RECOMMENDED.
-- Never approve a PR with a known security vulnerability.
-- If unsure whether something is a vulnerability, classify it as REQUIRED and explain the concern.
+- Never downgrade a security finding to RECOMMENDED or NOTE.
+- Never approve a review with a known security vulnerability.
+- If you are unsure whether something is exploitable, classify it REQUIRED.
+  The developer can argue against it — but it must be acknowledged.
+- Run every grep check even when "nothing changed in auth code" — injection can appear anywhere.

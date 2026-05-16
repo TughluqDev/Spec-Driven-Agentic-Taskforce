@@ -10,112 +10,207 @@ description: >
 
 ## Purpose
 
-Fix the right thing. Guessing at fixes wastes time and introduces new bugs.
-Always diagnose before attempting a fix.
+Fix the root cause. Not the symptom.
+Every wasted guess introduces a new risk. Always diagnose before fixing.
 
 ## When to Use
 
-When a command fails, a test fails, or the implementation does not behave as expected.
-
-## Input
-
-- The failing command and its full output
-- The file(s) involved
-- The contract requirement that is failing
-
-## Output
-
-A targeted fix that addresses the root cause, or a clear report to the Planner
-if the fix is outside scope.
+When a command fails, a test fails, a type error appears, or behavior is wrong.
+Use this before attempting any fix.
 
 ---
 
-## Diagnosis Process
+## Diagnosis Protocol
 
-### Step 1 — Read the full error message
+### Step 1 — Read the full error, word for word
 
-Read every line. Do not skim. Error messages often contain:
+Do not skim. Error messages contain:
 - The exact file and line number
 - The exact condition that failed
-- The expected vs actual value
+- Expected vs actual values
+- Stack trace showing the execution path
 
-### Step 2 — Locate the failing code
+Read from the **bottom of the stack trace** upward — the actual cause is usually at the bottom.
 
-Go to the exact file and line the error mentions.
-Read the surrounding 20 lines for context.
+### Step 2 — Go to the exact location
 
-### Step 3 — Form a hypothesis
+Open the file. Go to the exact line. Read 15–20 lines before and after.
+Understand the context.
 
-Based on the error and the code, form one specific hypothesis about the cause.
-Do not form multiple hypotheses. Pick the most likely one.
+### Step 3 — Form one hypothesis
 
-### Step 4 — Verify the hypothesis
+Based on the error and the code, form **one specific hypothesis**.
 
-Before fixing:
+Write it out: "I think the error is caused by X because Y."
+
+If you cannot form a specific hypothesis, re-read the error. The error message tells you.
+
+### Step 4 — Verify before fixing
+
+Ask:
 - Can you reproduce the error consistently?
-- Does the error match your hypothesis?
-- Is the fix implied directly by the error, or are you guessing?
+- Does the observed behavior match your hypothesis?
+- Is your fix implied directly by the error, or are you inferring?
 
-If you are guessing, re-read the error. Your hypothesis may be wrong.
+If you are inferring (guessing), re-read the error. Dig deeper.
 
-### Step 5 — Apply one targeted fix
+### Step 5 — One targeted fix
 
-Change the minimum amount of code to fix the root cause.
-Do not "fix" multiple things at once.
+Change the minimum code necessary to address the root cause.
+One change. Not two.
 
 ### Step 6 — Verify the fix
 
 Re-run the failing command. Confirm the error is gone.
-Check that you have not introduced a new failure:
+Then run a broader check to confirm no new failures:
+
 ```bash
-npm run lint && npm run typecheck && npm test
+# JavaScript / TypeScript
+npm run lint && npx tsc --noEmit && npm test
+
+# Python
+python -m flake8 . && python -m mypy . && python -m pytest
+
+# Go
+go vet ./... && go test ./...
+
+# Rust
+cargo clippy && cargo test
 ```
+
+If a new failure appears, stop. Do not fix the new failure without diagnosing it separately.
 
 ---
 
-## Common Failure Patterns
+## Language-Specific Failure Patterns
 
-### TypeScript type error
-- Read the type error exactly — it tells you what types are incompatible
-- Check function signatures and the types of values being passed
-- Do not use `any` to suppress errors — fix the underlying type mismatch
+### TypeScript type errors
+
+```
+Type 'X' is not assignable to type 'Y'
+```
+
+- The error tells you exactly which types are incompatible
+- Read the function signature and the type of the value being passed
+- Check if the function was recently changed (git diff)
+- **Never use `as any` to suppress — fix the underlying type mismatch**
+- Check if a type needs to be widened, narrowed, or if an interface needs updating
+
+```
+Object is possibly 'undefined'
+```
+- A value might be undefined before use
+- Add a null check: `if (!value) return ...`
+- Or use optional chaining: `value?.property`
+- Do not use `!` (non-null assertion) unless you are certain — it suppresses the compiler
 
 ### Module not found
-- Check the import path (case-sensitive on Linux)
-- Check the file actually exists at that path
+
+```
+Cannot find module './utils' or its corresponding type declarations
+```
+
+- Check the exact path (case-sensitive on Linux/Mac, not Windows)
+- Verify the file exists at that path: `ls src/utils*`
 - Check if it was supposed to be created in a previous task
+- Check if the extension matters: `.ts` vs `.js` vs no extension
 
-### Test failure
-- Read the exact assertion failure: expected vs received
-- Check if the test is correct or if the implementation is wrong
-- Check if a previous task that this test depends on was completed
+### Test failures
 
-### Command not found
-- The project may not have this command
-- Check `package.json` scripts or Makefile
-- Use the correct command for this project
+```
+Expected: "foo"
+Received: "bar"
+```
+
+- Read which assertion failed and what the expected vs actual values are
+- Check if the test is testing the right thing (the test might be wrong)
+- Check if a previous task this test depends on was completed
+- Run just this one test to isolate: `npx vitest run --reporter=verbose src/foo.test.ts`
+
+### Build failures — missing peer dependency
+
+```
+Cannot find module 'react' from 'node_modules/...'
+```
+
+- Install the missing dependency: `npm install react`
+- Or check if the version mismatch is causing the issue
 
 ### Port already in use
-- Another process is using the port
-- Use a different port for testing or kill the other process
+
+```
+Error: listen EADDRINUSE: address already in use :::3000
+```
+
+**Windows:**
+```powershell
+netstat -ano | findstr :3000
+# Get the PID from the last column
+taskkill /PID <pid> /F
+```
+
+**Linux / Mac:**
+```bash
+lsof -ti :3000 | xargs kill -9
+# or use a different port
+```
+
+### Python ImportError
+
+```
+ModuleNotFoundError: No module named 'X'
+```
+
+- Verify the module is installed: `pip show X`
+- Check virtual environment is activated
+- Install if missing: `pip install X`
+
+### Go build errors
+
+```
+undefined: SomeFunction
+```
+
+- Check the function exists in the package: `grep -rn "func SomeFunction" .`
+- Check the import path is correct
+- Run `go mod tidy` to sync dependencies
 
 ---
 
 ## When to Stop and Report
 
-Stop debugging and report to the Planner if:
-- The fix requires modifying a file not on the allowed list
-- The fix requires changing the contract requirements
-- You have tried one targeted fix and it did not work
-- The error reveals a design problem that requires re-planning
+Stop debugging and escalate to the Planner if:
 
-Report the exact error, your hypothesis, and why you are stopping.
+1. The fix requires modifying a file not on the allowed list
+2. The fix requires changing the contract requirements
+3. You have tried **one targeted fix** and it did not work
+4. The error reveals a design problem that requires re-planning
+5. The error is in a dependency outside your control
+
+**Report:**
+- Exact failing command and its full output
+- File and line where the error occurs
+- Your hypothesis (what you think is causing it)
+- What you tried (your one fix and its result)
+- Why you are stopping (which condition above applies)
+
+---
+
+## Anti-patterns (never do these)
+
+- `// @ts-ignore` or `// @ts-nocheck` — suppresses type safety
+- Catching and discarding errors: `try { ... } catch (e) {}` 
+- `|| true` to make a command appear to exit 0
+- Commenting out failing tests to make the suite "pass"
+- `any` in TypeScript to bypass type checking
+- `2>/dev/null` to hide error output
+- `--force` flags without understanding why the check is failing
 
 ---
 
 ## Safety Rules
 
-- Never suppress errors with try/catch, `|| true`, or `2>/dev/null` to make a command appear to pass.
-- Never use `any` in TypeScript to bypass type errors.
-- Never comment out failing tests.
-- One fix at a time. Verify before moving on.
+- One diagnosis → one hypothesis → one fix → verify.
+- Never suppress the error without understanding it.
+- Never retry the same fix. If it didn't work, your hypothesis is wrong.
+- If you have fixed the same type of error twice in the same session, step back and look for the common root cause.
