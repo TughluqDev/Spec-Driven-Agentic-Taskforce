@@ -1,6 +1,6 @@
 # Agentic Taskforce
 
-A **production-grade multi-agent engineering workflow** built on Claude Code. Five specialist AI agents collaborate in a structured pipeline to plan, implement, test, review, and document software changes, with built-in quality gates that prevent any agent from claiming success without real evidence.
+A **production-grade multi-agent engineering workflow** with five specialist AI agents collaborate in a structured pipeline to plan, implement, test, review, and document software changes, with built-in quality gates that prevent any agent from claiming success without real evidence.
 
 ---
 
