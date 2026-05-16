@@ -18,7 +18,7 @@ User Request
        │
        ▼
 ┌─────────────────┐
-│   PROGRAMMER    │  Implements code — only from the contract, nothing else.
+│   PROGRAMMER    │  Implements code only from the contract, nothing else.
 └────────┬────────┘
          │
          ▼
@@ -60,7 +60,7 @@ The Planner is the **only** entry point. You always talk to the Planner.
 
 ## Quality gates
 
-Every gate is enforced — not suggested.
+Every gate is enforced  not suggested.
 
 | Gate | Enforced by | What blocks progress |
 |------|-------------|----------------------|
@@ -93,7 +93,7 @@ All artifacts live in `.claude/work/` and form the shared memory of the pipeline
 
 ## Skills system
 
-Each agent loads a set of **skills** — detailed instruction sets that govern exactly how to perform specialized tasks. Skills prevent agents from improvising in high-stakes moments.
+Each agent loads a set of **skills**  detailed instruction sets that govern exactly how to perform specialized tasks. Skills prevent agents from improvising in high-stakes moments.
 
 | Agent | Skills |
 |-------|--------|
@@ -156,7 +156,7 @@ The Planner classifies every unknown before starting work:
 
 | Class | Meaning | Action |
 |-------|---------|--------|
-| **BLOCKING** | Cannot write a valid plan without an answer | Stops and asks — all at once, never one at a time |
+| **BLOCKING** | Cannot write a valid plan without an answer | Stops and asks  all at once, never one at a time |
 | **NON-BLOCKING** | Safe assumption exists | Records assumption in `DECISIONS.md`, continues |
 | **NICE-TO-HAVE** | Not critical now | Defers entirely, does not ask |
 
@@ -181,28 +181,28 @@ A `TEST_REPORT.md` that says PASS without this evidence is invalid and the Revie
 ## Folder structure
 
 ```
-CLAUDE.md                   — Project-wide rules governing all agents
-AGENTS.md                   — Human-readable agent team reference
-HOW_TO_USE.md               — Full setup and usage guide
-README.md                   — This file
+CLAUDE.md                    Project-wide rules governing all agents
+AGENTS.md                    Human-readable agent team reference
+HOW_TO_USE.md                Full setup and usage guide
+README.md                    This file
 
 .claude/
-├── settings.json           — Claude Code permissions
+├── settings.json            Claude Code permissions
 ├── agents/
-│   ├── planner.md          — Planner (Opus 4.7) — orchestrator
-│   ├── programmer.md       — Programmer (Sonnet 4.6) — code only
-│   ├── tester.md           — Tester (Sonnet 4.6) — verification
-│   ├── reviewer.md         — Reviewer (Opus 4.7) — quality gate
-│   └── documentor.md       — Documentor (Sonnet 4.6) — docs + PR
+│   ├── planner.md           Planner (Opus 4.7)  orchestrator
+│   ├── programmer.md        Programmer (Sonnet 4.6)  code only
+│   ├── tester.md            Tester (Sonnet 4.6)  verification
+│   ├── reviewer.md          Reviewer (Opus 4.7)  quality gate
+│   └── documentor.md        Documentor (Sonnet 4.6)  docs + PR
 │
-├── skills/                 — 17 skill files, one per specialized task
+├── skills/                  17 skill files, one per specialized task
 │   ├── planner-*/
 │   ├── programmer-*/
 │   ├── tester-*/
 │   ├── reviewer-*/
 │   └── documentor-*/
 │
-└── work/                   — Workflow artifacts (written and read by agents)
+└── work/                    Workflow artifacts (written and read by agents)
     ├── PROJECT_BRIEF.md
     ├── MASTER_PLAN.md
     ├── IMPLEMENTATION_CONTRACT.md
@@ -238,11 +238,11 @@ Check whether the agent system is usable and write a readiness report to .claude
 
 The system has been validated with a full dry-run check. Verdict: **PASS**
 
-- 5 agent files — all present, valid YAML frontmatter, correct tool and skill assignments
-- 17 skill files — all present and non-empty
-- 10 work artifact templates — all present
+- 5 agent files  all present, valid YAML frontmatter, correct tool and skill assignments
+- 17 skill files  all present and non-empty
+- 10 work artifact templates  all present
 - Planner confirmed as sole orchestrator with Agent tool access
-- Programmer confirmed without Agent tool (cannot delegate — by design)
+- Programmer confirmed without Agent tool (cannot delegate  by design)
 - Tester confirmed with backend API check instructions (curl + PowerShell) and Playwright MCP fallback
 - Reviewer confirmed with security check skill covering OWASP Top 10
 - Documentor confirmed with honest PASS/FAIL rules enforced
